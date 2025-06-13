@@ -1,0 +1,5 @@
+# compile just the scripts project
+npx tsc -p scripts/tsconfig.json
+
+# run the generated file (now ES-module compatible)
+node dist/dump-viem-chains.js

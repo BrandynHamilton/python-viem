@@ -27,7 +27,13 @@ dependencies = [
 include = ["python_viem", "python_viem.*"]
 
 [tool.setuptools.package-data]
-python_viem = ["*.json"]
+python_viem = ["viem-chains.json"]
+
+[dependency-groups]
+dev = [
+    "build>=1.1.1",
+    "twine>=4.0.2",
+]
 
 [tool.setuptools]
 include-package-data = true

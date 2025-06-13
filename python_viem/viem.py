@@ -1,65 +1,65 @@
-import requests
-import re
 import json
 import os
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+from importlib import resources
 
-# ------------------------------
-# Internal: Try fetching viem chains from GitHub
-# ------------------------------
+# ---------------------------------------------------------------------
+# Internal utils
+# ---------------------------------------------------------------------
 
-def _fetch_viem_chains_from_github() -> list:
+def _load_snapshot() -> List[Dict[str, Any]]:
+    """Load the built-in viem_chains.json (dict *or* list)."""
     try:
-        url = "https://raw.githubusercontent.com/wevm/viem/main/src/chains.ts"
-        res = requests.get(url, timeout=3)
+        text = resources.files(__package__).joinpath("viem-chains.json").read_text(
+            encoding="utf-8"
+        )
+        data = json.loads(text)
 
-        if res.status_code != 200:
-            raise RuntimeError("Failed to fetch viem chains.ts")
+        # ── accept `{ name: {...}, … }` or `[ {...}, … ]` ──────────────────────
+        if isinstance(data, dict):      # ← your current file
+            return list(data.values())
+        if isinstance(data, list):      # ← previous code path
+            return data
 
-        ts_code = res.text
-        match = re.search(r'export const chains = (\[.*?\n(?:.*?\n)*?\]);', ts_code)
-        if not match:
-            raise ValueError("Could not extract chains array")
+        raise ValueError("Snapshot must be a JSON dict or array")
+    except Exception as exc:
+        raise RuntimeError(f"[python-viem] Could not read viem_chains.json: {exc}") from exc
 
-        chains_array_ts = match.group(1)
+# ---------------------------------------------------------------------
+# Lazy-loaded global maps
+# ---------------------------------------------------------------------
 
-        # TypeScript → JSON conversion
-        chains_array_json = re.sub(r"(\w+):", r'"\1":', chains_array_ts)   # keys
-        chains_array_json = chains_array_json.replace("'", '"')            # quotes
-        chains_array_json = re.sub(r",(\s*[}\]])", r"\1", chains_array_json)  # trailing commas
+_CHAINS: List[Dict[str, Any]] = _load_snapshot()
 
-        return json.loads(chains_array_json)
+# indexed for O(1) lookup
+_CHAINS_BY_ID: Dict[int, Dict[str, Any]] = {c["id"]: c for c in _CHAINS}
+_CHAINS_BY_NAME: Dict[str, Dict[str, Any]] = {c["name"].lower(): c for c in _CHAINS}
 
-    except Exception as e:
-        print(f"[python-viem] Fallback to local chains: {e}")
-        return None
+# ---------------------------------------------------------------------
+# Public helpers
+# ---------------------------------------------------------------------
 
-# ------------------------------
-# Internal: Load chains (live or fallback)
-# ------------------------------
 
-def _load_chains() -> list:
-    chains = _fetch_viem_chains_from_github()
-    print(F'chain: {chains}')
-    if chains:
-        return chains
+def get_chain_by_id(chain_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Return chain metadata given a numeric chain ID.
 
-    # Load fallback
-    fallback_path = os.path.join(os.path.dirname(__file__), "viem_chains.json")
-    with open(fallback_path) as f:
-        return json.load(f)
-
-# ------------------------------
-# Public Access: Lazy-loaded maps
-# ------------------------------
-
-_CHAINS = _load_chains()
-_CHAINS_BY_ID = {c["id"]: c for c in _CHAINS}
-_CHAINS_BY_NAME = {c["name"].lower(): c for c in _CHAINS}
-
-def get_chain_by_id(chain_id: int) -> dict:
-    """Return chain metadata for a given chain ID."""
+    Example
+    -------
+    >>> get_chain_by_id(8453)["name"]
+    'Base'
+    """
     return _CHAINS_BY_ID.get(chain_id)
 
-def get_chain_by_name(name: str) -> dict:
-    """Return chain metadata by case-insensitive name."""
+
+def get_chain_by_name(name: str) -> Optional[Dict[str, Any]]:
+    """
+    Return chain metadata by (case-insensitive) chain name.
+
+    Example
+    -------
+    >>> get_chain_by_name("base sepolia")["id"]
+    84532
+    """
     return _CHAINS_BY_NAME.get(name.lower())
