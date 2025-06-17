@@ -1,6 +1,6 @@
 # python-viem
 
-`python-viem` is a lightweight utility for retrieving EVM chain metadata from a local snapshot (`viem-chains.json`). It supports fast O(1) lookups by either numeric chain ID or human-readable name.
+`python-viem` is a lightweight Python utility that mirrors EVM chain metadata from the Viem TypeScript library. It enables standardized, cross-language access to chain definitions and supports fast O(1) lookups by chain ID, name, or network slug.
 
 ---
 
