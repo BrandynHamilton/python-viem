@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from importlib import resources
@@ -7,6 +8,9 @@ from importlib import resources
 # ---------------------------------------------------------------------
 # Internal utils
 # ---------------------------------------------------------------------
+
+def slugify(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 def _load_snapshot() -> List[Dict[str, Any]]:
     """Load the built-in viem_chains.json (dict *or* list)."""
@@ -35,11 +39,15 @@ _CHAINS: List[Dict[str, Any]] = _load_snapshot()
 # indexed for O(1) lookup
 _CHAINS_BY_ID: Dict[int, Dict[str, Any]] = {c["id"]: c for c in _CHAINS}
 _CHAINS_BY_NAME: Dict[str, Dict[str, Any]] = {c["name"].lower(): c for c in _CHAINS}
+_CHAINS_BY_NETWORK: Dict[str, Dict[str, Any]] = {}
 
+for chain in _CHAINS:
+    network = chain.get("network")
+    key = network.lower() if network else slugify(chain["name"])
+    _CHAINS_BY_NETWORK[key] = chain
 # ---------------------------------------------------------------------
 # Public helpers
 # ---------------------------------------------------------------------
-
 
 def get_chain_by_id(chain_id: int) -> Optional[Dict[str, Any]]:
     """
@@ -52,7 +60,6 @@ def get_chain_by_id(chain_id: int) -> Optional[Dict[str, Any]]:
     """
     return _CHAINS_BY_ID.get(chain_id)
 
-
 def get_chain_by_name(name: str) -> Optional[Dict[str, Any]]:
     """
     Return chain metadata by (case-insensitive) chain name.
@@ -63,3 +70,14 @@ def get_chain_by_name(name: str) -> Optional[Dict[str, Any]]:
     84532
     """
     return _CHAINS_BY_NAME.get(name.lower())
+
+def get_chain_by_network(network: str) -> Optional[Dict[str, Any]]:
+    """
+    Return chain metadata by (case-insensitive) network name.
+
+    Example
+    -------
+    >>> get_chain_by_network("base-sepolia")["id"]
+    43113
+    """
+    return _CHAINS_BY_NETWORK.get(network.lower())
